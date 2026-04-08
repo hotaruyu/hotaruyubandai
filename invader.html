@@ -133,31 +133,24 @@ const livesEl = document.getElementById('lives');
 const msgEl = document.getElementById('message');
 
 // --- Audio ---
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// AudioContextはユーザー操作の中で遅延生成（iOS対策）
+let audioCtx = null;
 
-// iOS unlock: play a silent buffer on first touch
-let audioUnlocked = false;
-function unlockAudio() {
-  if (audioUnlocked) return;
-  audioUnlocked = true;
-  const buf = audioCtx.createBuffer(1, 1, 22050);
-  const src = audioCtx.createBufferSource();
-  src.buffer = buf;
-  src.connect(audioCtx.destination);
-  src.start(0);
-  audioCtx.resume();
+function getAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
 }
-document.addEventListener('touchstart', unlockAudio, { once: true });
-document.addEventListener('touchend',   unlockAudio, { once: true });
-document.addEventListener('click',      unlockAudio, { once: true });
-document.addEventListener('keydown',    unlockAudio, { once: true });
 
 function playTone(freq, type, duration, vol = 0.3, startFreq = null, delay = 0) {
-  const t = audioCtx.currentTime + delay;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
+  const ac = getAudio();
+  const t = ac.currentTime + delay;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
   osc.connect(gain);
-  gain.connect(audioCtx.destination);
+  gain.connect(ac.destination);
   osc.type = type;
   osc.frequency.setValueAtTime(startFreq || freq, t);
   if (startFreq) osc.frequency.exponentialRampToValueAtTime(freq, t + duration);
@@ -183,14 +176,15 @@ function sfxMarch() { playTone(marchFreqs[marchStep++ % 4], 'square', 0.09, 0.18
 let ufoOsc = null, ufoGain = null;
 function startUFOHum() {
   if (ufoOsc) return;
-  ufoOsc = audioCtx.createOscillator();
-  ufoGain = audioCtx.createGain();
+  const ac = getAudio();
+  ufoOsc = ac.createOscillator();
+  ufoGain = ac.createGain();
   ufoOsc.connect(ufoGain);
-  ufoGain.connect(audioCtx.destination);
+  ufoGain.connect(ac.destination);
   ufoOsc.type = 'sawtooth';
   ufoOsc.frequency.value = 60;
-  const lfo = audioCtx.createOscillator();
-  const lfoGain = audioCtx.createGain();
+  const lfo = ac.createOscillator();
+  const lfoGain = ac.createGain();
   lfo.connect(lfoGain);
   lfoGain.connect(ufoOsc.frequency);
   lfo.frequency.value = 8;
@@ -200,12 +194,12 @@ function startUFOHum() {
   ufoOsc.start();
 }
 function stopUFOHum() {
-  if (!ufoOsc) return;
+  if (!ufoOsc || !audioCtx) return;
   ufoGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
   ufoOsc.stop(audioCtx.currentTime + 0.2);
   ufoOsc = null; ufoGain = null;
 }
-function resumeAudio() { unlockAudio(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+function resumeAudio() { getAudio(); }
 
 // --- State ---
 let state = 'title';

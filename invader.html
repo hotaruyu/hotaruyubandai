@@ -135,6 +135,23 @@ const msgEl = document.getElementById('message');
 // --- Audio ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
+// iOS unlock: play a silent buffer on first touch
+let audioUnlocked = false;
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  const buf = audioCtx.createBuffer(1, 1, 22050);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(audioCtx.destination);
+  src.start(0);
+  audioCtx.resume();
+}
+document.addEventListener('touchstart', unlockAudio, { once: true });
+document.addEventListener('touchend',   unlockAudio, { once: true });
+document.addEventListener('click',      unlockAudio, { once: true });
+document.addEventListener('keydown',    unlockAudio, { once: true });
+
 function playTone(freq, type, duration, vol = 0.3, startFreq = null, delay = 0) {
   const t = audioCtx.currentTime + delay;
   const osc = audioCtx.createOscillator();
@@ -188,7 +205,7 @@ function stopUFOHum() {
   ufoOsc.stop(audioCtx.currentTime + 0.2);
   ufoOsc = null; ufoGain = null;
 }
-function resumeAudio() { if (audioCtx.state === 'suspended') audioCtx.resume(); }
+function resumeAudio() { unlockAudio(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
 
 // --- State ---
 let state = 'title';
